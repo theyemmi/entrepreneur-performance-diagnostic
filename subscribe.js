@@ -3,7 +3,7 @@
 // as an environment variable (never exposed to the browser).
 //
 // Required environment variables (set in Vercel → Project → Settings → Environment Variables):
-//   MAILCHIMP_API_KEY        e.g. abcd1234abcd1234abcd1234abcd1234-us21
+//   MAILCHIMP_API_KEY        32 chars + a dash + your server prefix, e.g. -us21
 //   MAILCHIMP_SERVER_PREFIX  the part after the dash in your API key, e.g. us21
 //   MAILCHIMP_LIST_ID        your Audience ID (Audience > Settings > Audience name and defaults)
 

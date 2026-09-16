@@ -14,7 +14,7 @@ that adds each completed lead to your Mailchimp audience.
 
 | Variable | Where to find it |
 |---|---|
-| `MAILCHIMP_API_KEY` | Mailchimp → Account → Extras → API keys. Looks like `abcd1234abcd1234abcd1234abcd1234-us21`. |
+| `MAILCHIMP_API_KEY` | Mailchimp → Account → Extras → API keys. Format: 32 letters/numbers, a dash, then your server prefix (e.g. `-us21`). |
 | `MAILCHIMP_SERVER_PREFIX` | The part after the dash in your API key — e.g. `us21`. |
 | `MAILCHIMP_LIST_ID` | Mailchimp → Audience → Settings → Audience name and defaults → "Audience ID". |
 
