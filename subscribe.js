@@ -1,11 +1,8 @@
 // Vercel serverless function: POST /api/subscribe
-// Adds the person to your Mailchimp audience using the API key stored
-// as an environment variable (never exposed to the browser).
-//
-// Required environment variables (set in Vercel → Project → Settings → Environment Variables):
-//   MAILCHIMP_API_KEY        32 chars + a dash + your server prefix, e.g. -us21
-//   MAILCHIMP_SERVER_PREFIX  the part after the dash in your API key, e.g. us21
-//   MAILCHIMP_LIST_ID        your Audience ID (Audience > Settings > Audience name and defaults)
+// Adds/updates the person in your Mailchimp audience.
+// Mailchimp credentials stay server-side in Vercel environment variables.
+
+const crypto = require('crypto');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -17,9 +14,13 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
-  const { name, email, score, weakPillar, pillars } = body || {};
 
-  const emailOk = typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const { name, email, score, weakPillar } = body || {};
+
+  const emailOk =
+    typeof email === 'string' &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   if (!emailOk) {
     res.status(400).json({ error: 'A valid email is required' });
     return;
@@ -35,8 +36,6 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // Simple score bucket + weak pillar as tags, so you can segment in Mailchimp
-  // without needing to create custom merge fields first.
   const scoreBucket =
     typeof score === 'number'
       ? score >= 80 ? 'score-80-100'
@@ -49,18 +48,25 @@ module.exports = async (req, res) => {
   if (weakPillar) tags.push('weak-' + String(weakPillar).toLowerCase());
   if (scoreBucket) tags.push(scoreBucket);
 
+  const memberHash = crypto
+    .createHash('md5')
+    .update(email.trim().toLowerCase())
+    .digest('hex');
+
   try {
+    // PUT is an upsert: a returning visitor gets the newest name/tags
+    // instead of a "Member Exists" dead-end.
     const mcRes = await fetch(
-      `https://${SERVER}.api.mailchimp.com/3.0/lists/${LIST_ID}/members`,
+      `https://${SERVER}.api.mailchimp.com/3.0/lists/${LIST_ID}/members/${memberHash}`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `apikey ${API_KEY}`,
         },
         body: JSON.stringify({
-          email_address: email,
-          status: 'subscribed', // change to 'pending' if you want double opt-in
+          email_address: email.trim().toLowerCase(),
+          status_if_new: 'subscribed',
           merge_fields: {
             FNAME: name || '',
           },
@@ -72,13 +78,10 @@ module.exports = async (req, res) => {
     const data = await mcRes.json();
 
     if (!mcRes.ok) {
-      // Mailchimp returns 400 "Member Exists" if they already subscribed — treat as success.
-      if (data.title === 'Member Exists') {
-        res.status(200).json({ ok: true, note: 'already subscribed' });
-        return;
-      }
       console.error('Mailchimp error:', data);
-      res.status(mcRes.status).json({ error: data.detail || 'Mailchimp error' });
+      res.status(mcRes.status).json({
+        error: data.detail || 'Mailchimp error'
+      });
       return;
     }
 
